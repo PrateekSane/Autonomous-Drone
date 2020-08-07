@@ -1,0 +1,167 @@
+#ifndef quad
+#define quad 
+#include <iostream>
+#include <stdio.h>
+#include <wiringPiI2C.h>
+#include <stdlib.h>
+#include <wiringPi.h>
+#include <cmath>
+#define Device_Address 0x68	/*Device Address/Identifier for MPU6050*/
+
+#define PWR_MGMT_1   0x6B
+#define SMPLRT_DIV   0x19
+#define CONFIG       0x1A
+#define GYRO_CONFIG  0x1B
+#define INT_ENABLE   0x38
+#define ACCEL_XOUT_H 0x3B
+#define ACCEL_YOUT_H 0x3D
+#define ACCEL_ZOUT_H 0x3F
+#define GYRO_XOUT_H  0x43
+#define GYRO_YOUT_H  0x45
+#define GYRO_ZOUT_H  0x47
+#endif
+int fd;
+using namespace std;
+
+float gx, gy, gz, ax,ay,az; 
+float xmean = -0.0505, ymean = -0.3934, zmean = -2.19461, xstd = .007, ystd = .016, zstd =.014;
+float X = xmean, Y = ymean, Z = 0;
+float zupper = zstd*2, zlower = -zstd*2;
+int count = 0;
+
+//std functions
+
+void MPU6050_Init();
+short read_raw_data(int addr);
+void ms_delay(int val);
+int collect_data();
+int zPos ();
+int zPID (float kp, float ki, float kd, float threshold, int curspeed, int runtime);
+
+int main() {
+	MPU6050_Init();
+	fd = wiringPiI2CSetup(Device_Address);
+
+	/*or (int i = 0; i < 40; i++) { 
+		zPos();
+		//cout << "Z:  " << Z << endl;	
+		
+	}
+	cout << count << endl;
+	*/
+	for (int i =0; i < 100; i++) {
+		collect_data();
+		delay(3);
+	}
+	//cout << zupper << "\t" << zlower << endl;
+	return 0;
+}
+/*
+int zPID (float kp, float ki, float kd, float threshold, int curspeed, int runtime) {
+	zPos();
+	float err = Z - zmean;
+	float preverr = err;
+	float deriv = err - preverr;
+	float totsum = 0;
+	float power = 0;
+
+	for (int i = 0; i < runtime; i++) {
+		zPos();
+		if (Z <= zupper && Z >= zlower){
+			cout << "Target Achieved" << endl;
+			delay(200);
+		}
+		err = Z - zmean;
+		deriv = err - preverr;
+		
+		power += kp * err;
+		power += kd * deriv;
+		
+		if (abs(totsum) >= threshold) {
+			power += ki * err;
+		}
+		
+		curspeed += power;
+		//assign power to motors
+		cout << "gyro: \t" << Z << endl;
+		//cout << "  CurSpeed: \t" << curspeed << "  err: \t" << err << "  Deriv: \t" << deriv << "  TotSum: \t" << totsum << endl;
+		preverr = err;
+		totsum += err;
+		power = 0;
+	}
+	return 0;
+}
+*/
+int zPos () {
+	int freq = 5;
+	int rollLen = 5;
+	float velocity = 0;
+	float runningSum;
+	for (int i = 0; i < rollLen; i++){
+		collect_data();
+		runningSum += az;
+		//cout<< "velocity: " << velocity << "\tZ: " << Z << endl;
+		cout << az << endl;
+		delay(freq);
+	}
+	az = runningSum/rollLen;
+	//cout << runningSum << endl;
+	if (az > zupper || az < zlower) {
+			count += 1;
+			Z += az;
+		}
+	return 0;
+}
+
+int collect_data(){
+	float Gyro_x,Gyro_y,Gyro_z;
+	float Acc_x,Acc_y,Acc_z;                 
+	
+	Acc_x = read_raw_data(ACCEL_XOUT_H);
+	Acc_y = read_raw_data(ACCEL_YOUT_H);
+	Acc_z = read_raw_data(ACCEL_ZOUT_H);
+
+	Gyro_x = read_raw_data(GYRO_XOUT_H);
+	Gyro_y = read_raw_data(GYRO_YOUT_H);
+	Gyro_z = read_raw_data(GYRO_ZOUT_H);
+	
+	ax = Acc_x/16384.0;
+	ay = Acc_y/16384.0;
+	az = Acc_z/8192.0 - zmean;
+	gx = Gyro_x/131;
+	gy = Gyro_y/131;
+	gz = Gyro_z/131;
+	 printf("\n Gx= %.3f \tGy= %.3f \tGz= %.3f\n",gx, gy, gz);
+	//printf("\n sumx= %.3f \tsumy= %.3f \tsumz= %.3f\n",Xsum, Ysum, Zsum);
+	//printf("\tAx=%.3f \tAy=%.3f \tAz=%.3f \n",ax,ay,az);
+	
+	return 0;
+}
+
+void MPU6050_Init(){
+	
+	wiringPiI2CWriteReg8 (fd, SMPLRT_DIV, 0x07);	/* Write to sample rate register */
+	wiringPiI2CWriteReg8 (fd, PWR_MGMT_1, 0x01);	/* Write to power management register */
+	wiringPiI2CWriteReg8 (fd, CONFIG, 0);		/* Write to Configuration register */
+	wiringPiI2CWriteReg8 (fd, GYRO_CONFIG, 24);	/* Write to Gyro Configuration register */
+	wiringPiI2CWriteReg8 (fd, INT_ENABLE, 0x01);	/*Write to interrupt enable register */
+} 
+	
+short read_raw_data(int addr){
+	short high_byte,low_byte,value;
+	high_byte = wiringPiI2CReadReg8(fd, addr);
+	low_byte = wiringPiI2CReadReg8(fd, addr+1);
+	value = (high_byte << 8) | low_byte;
+	return value;
+}
+
+void ms_delay(int val){
+	int i,j;
+	for(i=0;i<=val;i++)
+		for(j=0;j<1200;j++);
+}
+
+
+
+
+

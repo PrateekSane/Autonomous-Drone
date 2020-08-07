@@ -1,0 +1,43 @@
+#define GYRO_SENS 131.0
+#define GYRO_CONFIG 0b00000000
+
+#define ACCEL_SENS 16384.0
+#define ACCEL_CONFIG 0b00000000
+
+#define x_gyro_offset 0
+#define y_gyro_offset 0
+#define z_gyro_offset 0
+
+#define x_accel_offset 0
+#define y_accel_offset 0
+#define z_accel_offset 0
+
+#include <iostream>
+#include <unistd.h>
+#include <time.h>
+
+#define _POSIX_C_SOURCE 200809L //Used for calculating time
+
+
+class MPU6050 {
+	private:
+		void _update();
+
+		float ax, ay, az, gr, gp, gy;
+
+		int MPU6050_addr;
+		int f_dev; //Device file
+
+		float dt; //Loop time (recalculated with each loop)
+
+		struct timespec start,end; //Create a time structure
+
+		
+	public:
+		MPU6050(int8_t addr);
+		void getAccelRaw(float *ax, float *ay, float *az);
+		void getGyroRaw(float *gx, float *gy, float *gz);
+		void getAccel(float *x, float *y, float *z);
+		void getGyro(float *roll, float *pitch, float *yaw);
+		void getOffsets(float *ax_off, float *ay_off, float *az_off, float *gr_off, float *gp_off, float *gy_off);
+};
