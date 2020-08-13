@@ -8,6 +8,7 @@
 #include <pigpio.h>
 #include <cmath>
 #include <chrono>
+#include <fstream>
 #define Device_Address 0x68	/*Device Address/Identifier for MPU6050*/
 
 #define PWR_MGMT_1   0x6B
@@ -41,34 +42,41 @@ int zHold (int runTime);
 int zPID (int curspeed, float *prevErr, float *intSum);
 void finish();
 int fd = wiringPiI2CSetup(Device_Address);
+ofstream outdata;
 
 int main() {
 	for(int i = 0; i < 4; i++){
-		gpioServo(motors[i], 2000);
+		gpioServo(motors[i], 1200);
 	}
-	delay(5000);
-	
-	
+	delay(1000);
+	zHold(10);
+
 	finish();
+	//delay(1000);
 	return 0;
 }
 
 int zHold (int runTime) {
+	for(int i = 0; i < 4; i++){
+		gpioServo(motors[i], 1500);
+	}
 	int rollLen = 5;
 	float runningValues [rollLen];
 	float prevError = 0;
 	float currentIntegralSum = 0;
 	int timeSpent = 0;
 	int curspeed = 1500;
+	outdata.open("mpuRollData.csv");
 	
+	runTime = runTime * 1000;
 	while (timeSpent < runTime) {
 		auto start = high_resolution_clock::now();
 		for (int i = 0; i < rollLen; i++){
+			
 			collect_data();
 			//cout<< "velocity: " << velocity << "\tZ: " << Z << endl;
 			//cout << az << endl;
 			runningValues[count % rollLen] = az;
-			//cout << runningValues[0] << "\t" << runningValues[1] <<"\t" << runningValues[2] <<"\t" << runningValues[3] <<"\t" << runningValues[4] <<endl;
 			count++;
 		}
 		float runningSum = 0, avg = 0;
@@ -76,22 +84,30 @@ int zHold (int runTime) {
 			runningSum += runningValues[azVal];
 		}
 		avg = runningSum/rollLen;
-		//cout << "avg:  " << avg << endl;
-		
+		//cout << "avg:  " << runningSum << endl;
+		outdata << avg << ",";
 		if (avg > zupper || avg < zlower) {
 				Z += avg;
+				cout << "avg: " << Z << endl;
 				curspeed = zPID (curspeed, &prevError, &currentIntegralSum);
-				//assign motor power here
+				for(int i = 0; i < 4; i++){
+					gpioServo(motors[i], curspeed);
+				}	
 			}
+			
+		/*else {
+			cout << "curspeed: " << curspeed << "\tavg:  " << avg <<endl;
+		}*/
 		auto stop = high_resolution_clock::now();
 		auto duration = duration_cast<milliseconds>(stop-start);
 		timeSpent += duration.count();
 	}
+	outdata.close(); 
 	return 0;
 }
 
 int zPID (int curspeed, float *prevErr, float *intSum) {
-	float kp = 1, ki = 1, kd = 1, integralThreshold = 50;
+	float kp = 1, ki = 1, kd = 1, integralThreshold = 200;
 	float err = Z;
 	float deriv = err - *prevErr;
 	*intSum += err;
@@ -105,8 +121,11 @@ int zPID (int curspeed, float *prevErr, float *intSum) {
 	}
 	
 	curspeed += power;
+	if (curspeed > 2000) {
+		curspeed = 2000;
+	}
 	//cout << "gyro: \t" << Z << endl;
-	//cout << "CurSpeed: " << curspeed << "  err: " << err << "  Deriv: " << deriv << "  TotSum: " << *intSum << endl;
+	cout << "CurSpeed: " << curspeed << "  err: " << err << "  Deriv: " << deriv << "  TotSum: " << *intSum << endl;
 	*prevErr = err;
 
 	return curspeed;
@@ -167,9 +186,5 @@ short read_raw_data(int addr){
 	value = (high_byte << 8) | low_byte;
 	return value;
 }
-
-
-
-
 
 
