@@ -5,6 +5,7 @@
 #include <wiringPiI2C.h>
 #include <stdlib.h>
 #include <wiringPi.h>
+#include <pigpio.h>
 #include <cmath>
 #include <chrono>
 #define Device_Address 0x68	/*Device Address/Identifier for MPU6050*/
@@ -30,24 +31,25 @@ float xmean = -0.0505, ymean = -0.3934, zmean = -2.19461, xstd = .007, ystd = .0
 float X = xmean, Y = ymean, Z = 0;
 float zupper = zstd*2, zlower = -zstd*2;
 int count = 0;
+int res = gpioInitialise();
+int motors[4] = {13, 5, 16, 12};
 
-//std functions
-
-void MPU6050_Init();
+void init();
 short read_raw_data(int addr);
-void ms_delay(int val);
 int collect_data();
 int zHold (int runTime);
 int zPID (int curspeed, float *prevErr, float *intSum);
+void finish();
 int fd = wiringPiI2CSetup(Device_Address);
 
 int main() {
+	for(int i = 0; i < 4; i++){
+		gpioServo(motors[i], 2000);
+	}
+	delay(5000);
 	
-	MPU6050_Init();
 	
-
-	int time = 1;
-	zHold(time*1000);
+	finish();
 	return 0;
 }
 
@@ -135,15 +137,29 @@ int collect_data(){
 	return 0;
 }
 
-void MPU6050_Init(){
+void init(){
 	
 	wiringPiI2CWriteReg8 (fd, SMPLRT_DIV, 0x07);	/* Write to sample rate register */
 	wiringPiI2CWriteReg8 (fd, PWR_MGMT_1, 0x01);	/* Write to power management register */
 	wiringPiI2CWriteReg8 (fd, CONFIG, 0);		/* Write to Configuration register */
 	wiringPiI2CWriteReg8 (fd, GYRO_CONFIG, 24);	/* Write to Gyro Configuration register */
 	wiringPiI2CWriteReg8 (fd, INT_ENABLE, 0x01);	/*Write to interrupt enable register */
-} 
 	
+	for(int i = 0; i < 4; i++){
+		gpioSetMode(motors[i], PI_OUTPUT);
+		gpioServo(motors[i], 1000);
+	}
+	delay(1000);
+} 
+
+void finish() {
+	while(true) {
+		for(int i = 0; i < 4; i++){
+			gpioServo(motors[i], 1000);
+		}
+	}
+	gpioTerminate();
+}
 short read_raw_data(int addr){
 	short high_byte,low_byte,value;
 	high_byte = wiringPiI2CReadReg8(fd, addr);
@@ -152,11 +168,6 @@ short read_raw_data(int addr){
 	return value;
 }
 
-void ms_delay(int val){
-	int i,j;
-	for(i=0;i<=val;i++)
-		for(j=0;j<1200;j++);
-}
 
 
 
