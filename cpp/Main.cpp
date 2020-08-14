@@ -28,7 +28,7 @@ using namespace std;
 using namespace std::chrono;
 
 float gx, gy, gz, ax,ay,az; 
-float xmean = -0.0505, ymean = -0.3934, zmean = -2.19461, xstd = .007, ystd = .016, zstd =.014;
+float xmean = -0.0505, ymean = -0.3934, zmean = -2.19461, xstd = .007, ystd = .016, zstd =.081;
 float X = xmean, Y = ymean, Z = 0;
 float zupper = zstd*2, zlower = -zstd*2;
 int count = 0;
@@ -66,7 +66,7 @@ int zHold (int runTime) {
 	float currentIntegralSum = 0;
 	int timeSpent = 0;
 	int curspeed = 1500;
-	outdata.open("mpuRollData.csv");
+	//outdata.open("mpuRollData.csv");
 	
 	runTime = runTime * 1000;
 	while (timeSpent < runTime) {
@@ -85,7 +85,7 @@ int zHold (int runTime) {
 		}
 		avg = runningSum/rollLen;
 		//cout << "avg:  " << runningSum << endl;
-		outdata << avg << ",";
+		//outdata << avg << ",";
 		if (avg > zupper || avg < zlower) {
 				Z += avg;
 				cout << "avg: " << Z << endl;
@@ -102,7 +102,7 @@ int zHold (int runTime) {
 		auto duration = duration_cast<milliseconds>(stop-start);
 		timeSpent += duration.count();
 	}
-	outdata.close(); 
+	//outdata.close(); 
 	return 0;
 }
 
