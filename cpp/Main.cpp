@@ -50,7 +50,6 @@ int main() {
 	}
 	delay(1000);
 	zHold(10);
-
 	finish();
 	//delay(1000);
 	return 0;
@@ -66,7 +65,6 @@ int zHold (int runTime) {
 	float currentIntegralSum = 0;
 	int timeSpent = 0;
 	int curspeed = 1500;
-	//outdata.open("mpuRollData.csv");
 	
 	runTime = runTime * 1000;
 	while (timeSpent < runTime) {
@@ -85,7 +83,7 @@ int zHold (int runTime) {
 		}
 		avg = runningSum/rollLen;
 		//cout << "avg:  " << runningSum << endl;
-		//outdata << avg << ",";
+
 		if (avg > zupper || avg < zlower) {
 				Z += avg;
 				cout << "avg: " << Z << endl;
@@ -95,24 +93,23 @@ int zHold (int runTime) {
 				}	
 			}
 			
-		/*else {
-			cout << "curspeed: " << curspeed << "\tavg:  " << avg <<endl;
-		}*/
+		else {
+			cout << "curspeed: " << curspeed << "\tvelo:  " << Z <<endl;
+		}
 		auto stop = high_resolution_clock::now();
 		auto duration = duration_cast<milliseconds>(stop-start);
 		timeSpent += duration.count();
 	}
-	//outdata.close(); 
 	return 0;
 }
 
 int zPID (int curspeed, float *prevErr, float *intSum) {
-	float kp = 1, ki = 1, kd = 1, integralThreshold = 200;
+	float kp = 1, ki = .5, kd = 1, integralThreshold = 200;
 	float err = Z;
 	float deriv = err - *prevErr;
 	*intSum += err;
 	float power = 0;
-	
+	cout << "enter" << endl;
 	power += kp * err;
 	power += kd * deriv;
 	
