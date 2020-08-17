@@ -28,7 +28,7 @@ using namespace std;
 using namespace std::chrono;
 
 float gx, gy, gz, ax,ay,az; 
-float xmean = -0.0505, ymean = -0.3934, zmean = -2.19461, xstd = .007, ystd = .016, zstd =.081;
+float xmean = -0.0505, ymean = -0.3934, zmean = -2.21361, xstd = .007, ystd = .016, zstd =.081;
 float X = xmean, Y = ymean, Z = 0;
 float zupper = zstd*2, zlower = -zstd*2;
 int count = 0;
@@ -38,13 +38,14 @@ int motors[4] = {13, 5, 16, 12};
 void init();
 short read_raw_data(int addr);
 int collect_data();
-int zHold (int runTime);
+int hold (int runTime);
 int zPID (int curspeed, float *prevErr, float *intSum);
+int xyPID(int curspeed, float *prevErr, float *intSum);
 void finish();
 int fd = wiringPiI2CSetup(Device_Address);
-ofstream outdata;
 
 int main() {
+	/*
 	int starting_speed = 1000;
 	int target = 1450;
 	int cur_speed = starting_speed;
@@ -58,23 +59,24 @@ int main() {
 		delay(300);
 	}
 	delay(3000);
-	zHold(3);
+	*/
+	hold(3);
 	finish();
 	//delay(1000);
 	return 0;
 }
 
-int zHold (int runTime) {
+int hold (int runTime) {
 	for(int i = 0; i < 4; i++){
 		gpioServo(motors[i], 1500);
 	}
 	int rollLen = 5;
 	float runningValues [rollLen];
-	float prevError = 0;
-	float currentIntegralSum = 0;
+	float ZprevError = 0;
+	float ZcurrentIntegralSum = 0;
 	int timeSpent = 0;
 	int curspeed = 1500;
-	
+	float ZrunningSum = 0, Zavg = 0;
 	runTime = runTime * 1000;
 	while (timeSpent < runTime) {
 		auto start = high_resolution_clock::now();
@@ -86,17 +88,17 @@ int zHold (int runTime) {
 			runningValues[count % rollLen] = az;
 			count++;
 		}
-		float runningSum = 0, avg = 0;
+		ZrunningSum = 0, Zavg = 0;
 		for (int azVal = 0; azVal < rollLen; azVal++) {
-			runningSum += runningValues[azVal];
+			ZrunningSum += runningValues[azVal];
 		}
-		avg = runningSum/rollLen;
-		cout << "avg:  " << avg << endl;
+		Zavg = ZrunningSum/rollLen;
+		cout << "avg:  " << Zavg << endl;
 	
-		if (avg > zupper || avg < zlower) {
-				Z += avg;
+		if (Zavg > zupper || Zavg < zlower) {
+				Z += Zavg;
 				//cout << "avg: " << Z << endl;
-				curspeed = zPID (curspeed, &prevError, &currentIntegralSum);
+				curspeed = zPID (curspeed, &ZprevError, &ZcurrentIntegralSum);
 				for(int i = 0; i < 4; i++){
 					gpioServo(motors[i], curspeed);
 				}	
@@ -113,8 +115,55 @@ int zHold (int runTime) {
 }
 
 int zPID (int curspeed, float *prevErr, float *intSum) {
-	float kp = 1, ki = .5, kd = 1, integralThreshold = 200;
+	float kp = 5, ki = .5, kd = 1, integralThreshold = 200;
 	float err = Z;
+	float deriv = err - *prevErr;
+	*intSum += err;
+	float power = 0;
+	//cout << "enter" << endl;
+	
+	power += kp * err;
+	power += kd * deriv;
+	
+	if (abs(*intSum) >= integralThreshold) {
+		power += ki * err;
+	}
+	
+	curspeed += power;
+	if (curspeed > 2000) {
+		curspeed = 2000;
+	}
+	//cout << "gyro: \t" << Z << endl;
+	cout << "CurSpeed: " << curspeed << "  err: " << err << "  Deriv: " << deriv << "  TotSum: " << *intSum << endl;
+	cout << endl;
+	*prevErr = err;
+
+	return curspeed;
+}
+
+int xyPID(int curspeed, float *prevErr, float *intSum) {
+	float kp = 5, ki = .5, kd = 1, integralThreshold = 200;
+	float Xerr = X;
+	float Yerr = Y;
+	float err = pow(Xerr, 2) + pow(Yerr, 2);
+	//dont do else if because if both then i want to affect both
+	//for these dont directly change power in loop. Just change curspeed and affect at the end
+	if (Xerr < 0 && Yerr > 0) {
+		
+		//curspeed[0] affected (Red Right)
+	}
+	if (Xerr > 0 && Yerr > 0) {
+		
+		//curspeed[1] affected (Red Left)
+	}
+	if (Xerr < 0 && Yerr < 0) {
+		
+		//curspeed[3] affected (White Right)
+	}
+	if (Xerr < 0 && Yerr > 0) {
+		
+		//curspeed[4] affected (White Left)
+	}
 	float deriv = err - *prevErr;
 	*intSum += err;
 	float power = 0;
