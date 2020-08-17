@@ -45,11 +45,20 @@ int fd = wiringPiI2CSetup(Device_Address);
 ofstream outdata;
 
 int main() {
-	for(int i = 0; i < 4; i++){
-		gpioServo(motors[i], 1200);
+	int starting_speed = 1000;
+	int target = 1450;
+	int cur_speed = starting_speed;
+	int iter = 20;
+	int incriment = (target - starting_speed)/iter;
+	for (int build = 0; build < iter; build++) {
+		cur_speed += incriment;
+		for(int i = 0; i < 4; i++){
+			gpioServo(motors[i], cur_speed);
+		}
+		delay(300);
 	}
-	delay(1000);
-	zHold(10);
+	delay(3000);
+	zHold(3);
 	finish();
 	//delay(1000);
 	return 0;
@@ -82,11 +91,11 @@ int zHold (int runTime) {
 			runningSum += runningValues[azVal];
 		}
 		avg = runningSum/rollLen;
-		//cout << "avg:  " << runningSum << endl;
-
+		cout << "avg:  " << avg << endl;
+	
 		if (avg > zupper || avg < zlower) {
 				Z += avg;
-				cout << "avg: " << Z << endl;
+				//cout << "avg: " << Z << endl;
 				curspeed = zPID (curspeed, &prevError, &currentIntegralSum);
 				for(int i = 0; i < 4; i++){
 					gpioServo(motors[i], curspeed);
@@ -109,7 +118,8 @@ int zPID (int curspeed, float *prevErr, float *intSum) {
 	float deriv = err - *prevErr;
 	*intSum += err;
 	float power = 0;
-	cout << "enter" << endl;
+	//cout << "enter" << endl;
+	
 	power += kp * err;
 	power += kd * deriv;
 	
@@ -123,6 +133,7 @@ int zPID (int curspeed, float *prevErr, float *intSum) {
 	}
 	//cout << "gyro: \t" << Z << endl;
 	cout << "CurSpeed: " << curspeed << "  err: " << err << "  Deriv: " << deriv << "  TotSum: " << *intSum << endl;
+	cout << endl;
 	*prevErr = err;
 
 	return curspeed;
